@@ -2,7 +2,6 @@ package file
 
 import (
 	"archive/zip"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
@@ -11,18 +10,29 @@ import (
 )
 
 //Download source file with all results
-func Download(src, dest string) error {
+func Download(src, dest string) ([]string, error) {
 	if err := downloadFile(dest, src); err != nil {
+		return nil, err
+	}
+
+	files, err := unzip(dest, "tmp")
+
+	if err != nil {
+		return nil, err
+	}
+
+	return files, nil
+}
+
+//Remove all files after processing
+func Remove(path string) error {
+	if err := os.Remove(path); err != nil {
 		return err
 	}
 
-	fmt.Println("Downloaded file")
-
-	if err := unzip(dest, "tmp"); err != nil {
+	if err := os.RemoveAll("tmp"); err != nil {
 		return err
 	}
-
-	fmt.Println("unzip file")
 
 	return nil
 }
@@ -47,7 +57,6 @@ func downloadFile(path string, url string) error {
 	}
 
 	res, err := client.Get(url)
-	fmt.Println(res)
 
 	if err != nil {
 		return err
@@ -62,17 +71,20 @@ func downloadFile(path string, url string) error {
 	return nil
 }
 
-func unzip(src, dest string) error {
-	if err := os.Mkdir(dest, 0755); err != nil {
-		return err
+func unzip(src, dest string) ([]string, error) {
+	if _, err := os.Stat(dest); os.IsNotExist(err) {
+		if err := os.Mkdir(dest, 0755); err != nil {
+			return nil, err
+		}
 	}
 
+	var files []string
 	zipReader, _ := zip.OpenReader(src)
 	for _, file := range zipReader.Reader.File {
 
 		zippedFile, err := file.Open()
 		if err != nil {
-			return err
+			return nil, err
 		}
 		defer zippedFile.Close()
 
@@ -82,27 +94,27 @@ func unzip(src, dest string) error {
 		)
 
 		if file.FileInfo().IsDir() {
-			fmt.Println("Directory Created:", extractedFilePath)
 			os.MkdirAll(extractedFilePath, file.Mode())
 		} else {
-			fmt.Println("File extracted:", file.Name)
-
 			outputFile, err := os.OpenFile(
 				extractedFilePath,
 				os.O_WRONLY|os.O_CREATE|os.O_TRUNC,
 				file.Mode(),
 			)
 			if err != nil {
-				return err
+				return nil, err
 			}
+
 			defer outputFile.Close()
 
 			_, err = io.Copy(outputFile, zippedFile)
 			if err != nil {
-				return err
+				return nil, err
 			}
+
+			files = append(files, outputFile.Name())
 		}
 	}
 
-	return nil
+	return files, nil
 }

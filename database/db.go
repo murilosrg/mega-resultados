@@ -14,7 +14,7 @@ type Config struct {
 	Name string
 }
 
-const defaultURL = "mongodb://root:root@localhost:27017"
+const defaultURL = "mongodb://localhost:27017"
 const defaultName = "megaresultados"
 
 //Database is mongo database implementation
@@ -51,14 +51,14 @@ func New(config Config) *Database {
 	}
 }
 
-//InsertMany is an insert for many documents in the database
-func (d Database) InsertMany(collection string, documents []interface{}) (interface{}, error) {
-	res, err := d.conn.Collection(collection).InsertMany(nil, documents)
+//Insert document in the database
+func (d Database) Insert(collection string, document interface{}) (interface{}, error) {
+	res, err := d.conn.Collection(collection).InsertOne(nil, document)
 
 	if err != nil {
-		log.Fatalln("error to bulk insert", err)
+		log.Fatalln("error to insert", err)
 		return nil, err
 	}
 
-	return res.InsertedIDs, nil
+	return res.InsertedID, nil
 }
